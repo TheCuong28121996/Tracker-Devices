@@ -15,6 +15,7 @@ import com.tracker.devices.utils.PermisstionHelper
 class TrackerActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        setContentView(R.layout.main_activity)
 
         checkLocation()
 

@@ -2,15 +2,17 @@ package com.tracker.devices
 
 import android.Manifest
 import android.annotation.SuppressLint
-import android.app.PendingIntent
-import android.app.Service
+import android.app.*
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.graphics.Color
 import android.location.Location
+import android.os.Build
 import android.os.IBinder
 import android.util.Log
+import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import com.google.android.gms.location.*
 import com.google.android.gms.tasks.OnCompleteListener
@@ -26,6 +28,13 @@ import com.tracker.devices.utils.*
 
 class TrackerService : Service() {
 
+    companion object {
+        val stop = "stop"
+        val NOTIFICATION_CHANNEL_ID = "com.tracker.devices"
+        val channelName = "Tracker Service"
+
+    }
+
     private lateinit var entityLogs: EntityLogs
 
     override fun onBind(intent: Intent?): IBinder? {
@@ -34,16 +43,22 @@ class TrackerService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        buildNotification()
-        loginToFirebase()
-    }
-
-    private fun buildNotification() {
-        val stop = "stop"
-        registerReceiver(stopReceiver, IntentFilter(stop))
 
         val broadcastIntent =
             PendingIntent.getBroadcast(this, 0, Intent(stop), PendingIntent.FLAG_UPDATE_CURRENT)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundO(broadcastIntent)
+        } else {
+            startForeground(broadcastIntent)
+        }
+
+        loginToFirebase()
+    }
+
+    private fun startForeground(broadcastIntent: PendingIntent) {
+
+        registerReceiver(stopReceiver, IntentFilter(stop))
 
         val builder = NotificationCompat.Builder(this)
             .setContentTitle(getString(R.string.app_name))
@@ -51,6 +66,34 @@ class TrackerService : Service() {
             .setContentIntent(broadcastIntent)
             .setSmallIcon(R.mipmap.ic_launcher)
         startForeground(1, builder.build())
+    }
+
+    @RequiresApi(Build.VERSION_CODES.O)
+    private fun startForegroundO(broadcastIntent: PendingIntent) {
+
+        registerReceiver(stopReceiver, IntentFilter(stop))
+
+        val channel = NotificationChannel(
+            NOTIFICATION_CHANNEL_ID,
+            channelName,
+            NotificationManager.IMPORTANCE_NONE
+        )
+        channel.lightColor = Color.BLUE
+        channel.lockscreenVisibility = Notification.VISIBILITY_PRIVATE
+
+        val manager =
+            (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
+        manager.createNotificationChannel(channel)
+
+        val notificationBuilder = NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
+        val notification: Notification = notificationBuilder.setOnlyAlertOnce(true)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentText(getString(R.string.notification_text))
+            .setPriority(NotificationManager.IMPORTANCE_MIN)
+            .setCategory(Notification.CATEGORY_SERVICE)
+            .setContentIntent(broadcastIntent)
+            .build()
+        startForeground(1, notification)
     }
 
     protected var stopReceiver: BroadcastReceiver = object : BroadcastReceiver() {
@@ -68,8 +111,9 @@ class TrackerService : Service() {
                 override fun onComplete(p0: Task<AuthResult>) {
                     if (p0.isSuccessful) {
                         requestLocationUpdates()
+                        Log.d("TrackerService", "firebase auth success")
                     } else {
-                        Log.d("TrackerService", "firebase auth success");
+                        Log.d("TrackerService", "firebase auth fail")
                     }
                 }
             })
