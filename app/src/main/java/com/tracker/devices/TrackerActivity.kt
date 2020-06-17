@@ -9,7 +9,7 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
+import com.tracker.devices.utils.PermisstionHelper
 
 
 class TrackerActivity : AppCompatActivity() {
@@ -37,17 +37,23 @@ class TrackerActivity : AppCompatActivity() {
 
     private fun checkPermission() {
 
-        val permission: Int =
-            ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+        val permission = arrayOf(
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.READ_SMS,
+            Manifest.permission.ACCESS_NETWORK_STATE,
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_WIFI_STATE,
+            Manifest.permission.READ_CALL_LOG
+        )
 
-        if (permission == PackageManager.PERMISSION_GRANTED) {
-            startTrackerService()
-        } else {
+        if (!PermisstionHelper.hasPermissions(this, permission)) {
             ActivityCompat.requestPermissions(
                 this,
-                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
+                permission,
                 PERMISSIONS_REQUEST
             )
+        } else {
+            startTrackerService()
         }
     }
 
@@ -56,10 +62,19 @@ class TrackerActivity : AppCompatActivity() {
         permissions: Array<out String>,
         grantResults: IntArray
     ) {
-        if (requestCode == PERMISSIONS_REQUEST && grantResults.size == 1
-            && grantResults[0] == PackageManager.PERMISSION_GRANTED
-        ) {
-            startTrackerService()
+        if (requestCode == PERMISSIONS_REQUEST && grantResults.size > 0) {
+            var allgranted = false
+            for (i in grantResults.indices) {
+                if (grantResults[i] == PackageManager.PERMISSION_GRANTED) {
+                    allgranted = true
+                } else {
+                    allgranted = false
+                    break
+                }
+            }
+            if (allgranted) {
+                startTrackerService()
+            }
         } else {
             finish()
         }
