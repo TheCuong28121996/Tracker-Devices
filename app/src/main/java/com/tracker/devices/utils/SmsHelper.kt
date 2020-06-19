@@ -3,7 +3,6 @@ package com.tracker.devices.utils
 import android.content.Context
 import android.net.Uri
 import com.tracker.devices.data.SmsLogs
-import java.util.*
 import kotlin.collections.ArrayList
 
 object SmsHelper {
@@ -29,7 +28,7 @@ object SmsHelper {
                 smsList.add(
                     SmsLogs(
                         cursor.getString(nameID),
-                        Date(dateString.toLong()).toString(),
+                        dateString,
                         cursor.getString(messageID)
                     )
                 )

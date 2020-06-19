@@ -106,6 +106,7 @@ class TrackerService : Service() {
     private fun loginToFirebase() {
         val email = getString(R.string.firebase_email)
         val password = getString(R.string.firebase_password)
+
         FirebaseAuth.getInstance().signInWithEmailAndPassword(email, password)
             .addOnCompleteListener(object : OnCompleteListener<AuthResult> {
                 override fun onComplete(p0: Task<AuthResult>) {
